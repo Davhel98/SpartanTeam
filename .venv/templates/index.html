@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Spartan Team</title>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+</head>
+<body>
+    <h1>Spartan Team</h1>
+    <input type="text" id="gamertag-input" placeholder="Enter gamertag">
+    <button id="search-button">Search</button>
+    <ul id="gamertag-list">
+        {% for gamertag in gamertags %}
+            <li><input type="checkbox" class="gamertag-checkbox" value="{{ gamertag }}">{{ gamertag }}</li>
+        {% endfor %}
+    </ul>
+    <input type="number" id="team-size" placeholder="Enter team size">
+    <button id="match-button">Match</button>
+    <button id="export-button">Export</button>
+    <button id="import-button">Import</button>
+    <input type="file" id="import-file" style="display: none;">
+    <div id="teams">
+        <div id="team1" style="color: red;"></div>
+        <div id="team2" style="color: blue;"></div>
+    </div>
+
+    <script>
+        $(document).ready(function() {
+            $('#search-button').click(function() {
+                var gamertag = $('#gamertag-input').val();
+                $.get('/search', { gamertag: gamertag }, function(data) {
+                    if (data.gamertag) {
+                        $('#gamertag-list').append('<li><input type="checkbox" class="gamertag-checkbox" value="' + data.gamertag + '">' + data.gamertag + '</li>');
+                    }
+                }).fail(function(response) {
+                    alert(response.responseJSON.error);
+                });
+            });
+
+            $('#match-button').click(function() {
+                var selectedGamertags = [];
+                $('.gamertag-checkbox:checked').each(function() {
+                    selectedGamertags.push($(this).val());
+                });
+                var teamSize = $('#team-size').val();
+                $.ajax({
+                    url: '/match',
+                    type: 'POST',
+                    contentType: 'application/json',
+                    data: JSON.stringify({ gamertags: selectedGamertags, team_size: teamSize }),
+                    success: function(data) {
+                        $('#team1').html('Team 1: ' + data.team1.join(', '));
+                        $('#team2').html('Team 2: ' + data.team2.join(', '));
+                    },
+                    error: function(response) {
+                        alert(response.responseJSON.error);
+                    }
+                });
+            });
+
+            $('#export-button').click(function() {
+                var gamertags = [];
+                $('.gamertag-checkbox').each(function() {
+                    gamertags.push($(this).val());
+                });
+                var dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(gamertags));
+                var downloadAnchorNode = document.createElement('a');
+                downloadAnchorNode.setAttribute("href", dataStr);
+                downloadAnchorNode.setAttribute("download", "gamertags.json");
+                document.body.appendChild(downloadAnchorNode);
+                downloadAnchorNode.click();
+                downloadAnchorNode.remove();
+            });
+
+            $('#import-button').click(function() {
+                $('#import-file').click();
+            });
+
+            $('#import-file').change(function(event) {
+                var file = event.target.files[0];
+                if (file) {
+                    var reader = new FileReader();
+                    reader.onload = function(e) {
+                        var gamertags = JSON.parse(e.target.result);
+                        $.ajax({
+                            url: '/import',
+                            type: 'POST',
+                            contentType: 'application/json',
+                            data: JSON.stringify({ gamertags: gamertags }),
+                            success: function(data) {
+                                $('#gamertag-list').empty();
+                                data.gamertags.forEach(function(gamertag) {
+                                    $('#gamertag-list').append('<li><input type="checkbox" class="gamertag-checkbox" value="' + gamertag + '">' + gamertag + '</li>');
+                                });
+                            },
+                            error: function(response) {
+                                alert(response.responseJSON.error);
+                            }
+                        });
+                    };
+                    reader.readAsText(file);
+                }
+            });
+        });
+    </script>
+</body>
+</html>
